@@ -5,3 +5,4 @@ presidio-anonymizer
 fakeredis
 openai
 spacy
+python-dotenv
