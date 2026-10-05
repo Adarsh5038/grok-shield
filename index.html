@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grok Shield | Autonomous Privacy Firewall</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #030712; color: #f3f4f6; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .glass { background: rgba(17, 24, 39, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        
+        /* Toggle Switch */
+        .toggle-checkbox:checked { right: 0; border-color: #10b981; }
+        .toggle-checkbox:checked + .toggle-label { background-color: rgba(16, 185, 129, 0.2); border-color: #10b981; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #030712; }
+        ::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #374151; }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden selection:bg-emerald-500 selection:text-black">
+
+    <!-- Header -->
+    <header class="flex justify-between items-center px-6 py-4 glass shrink-0 border-b border-gray-800/80 z-50">
+        <!-- Logo -->
+        <div class="flex items-center space-x-3 w-1/3">
+            <div class="w-3 h-3 rounded-full bg-emerald-500 animate-ping"></div>
+            <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                GROK<span class="text-emerald-400 font-mono text-sm px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-800/50">SHIELD</span>
+            </h1>
+        </div>
+        
+        <!-- NEW: Dynamic Risk Meter -->
+        <div class="hidden md:flex flex-col items-center justify-center space-y-1 w-1/3">
+            <span class="text-[10px] uppercase tracking-widest text-gray-500 font-mono font-bold">Exposure Risk</span>
+            <div class="flex items-center gap-1">
+                <div id="risk-low" class="h-2 w-8 rounded-sm bg-emerald-500 shadow-[0_0_8px_#10b981] transition-all duration-300"></div>
+                <div id="risk-med" class="h-2 w-8 rounded-sm bg-gray-800 transition-all duration-300"></div>
+                <div id="risk-high" class="h-2 w-8 rounded-sm bg-gray-800 transition-all duration-300"></div>
+                <span id="risk-label" class="text-xs font-mono text-emerald-500 ml-2 font-bold w-10 text-center">LOW</span>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex items-center justify-end space-x-6 w-1/3">
+            <div class="flex items-center space-x-3">
+                <span class="text-xs font-medium text-gray-400">Fun Mode</span>
+                <div class="relative inline-block w-10 align-middle select-none transition duration-200 ease-in">
+                    <input type="checkbox" name="toggle" id="fun-toggle" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-gray-400 border-4 border-gray-800 appearance-none cursor-pointer transition-transform duration-200 ease-in-out"/>
+                    <label for="fun-toggle" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-900 border border-gray-700 cursor-pointer"></label>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Chat Area (Scrollable) -->
+    <main id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 w-full max-w-4xl mx-auto">
+        <!-- Messages will be injected here -->
+    </main>
+
+    <!-- Input Footer -->
+    <footer class="shrink-0 p-4 bg-[#030712] border-t border-gray-800/80 z-50">
+        <form id="chat-form" class="max-w-4xl mx-auto relative">
+            <input type="text" id="user-input" class="w-full rounded-2xl py-4 pl-6 pr-28 bg-gray-900/90 border border-gray-800 text-sm text-gray-100 placeholder-gray-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all shadow-2xl" placeholder="Test PII scrubbing (e.g., My name is Adarsh, password is Secret123)..." autocomplete="off">
+            <button type="submit" class="absolute right-2 top-2 bottom-2 bg-emerald-500 text-black px-6 rounded-xl text-xs font-bold tracking-wide hover:bg-emerald-400 transition active:scale-95 flex items-center gap-1.5 cursor-pointer">
+                <span>SEND</span>
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+            </button>
+        </form>
+        <div class="text-center mt-2.5 text-[10px] text-gray-500 mono tracking-wider">
+            SECURE ZERO-TRUST PROXY • MICROSOFT PRESIDIO + GROQ OSS
+        </div>
+    </footer>
+
+    <script>
+        const chatContainer = document.getElementById('chat-container');
+        const chatForm = document.getElementById('chat-form');
+        const userInput = document.getElementById('user-input');
+        const funToggle = document.getElementById('fun-toggle');
+
+        window.onload = () => {
+            appendSystemGreeting();
+        };
+
+        // NEW: Risk Meter Logic
+        function updateRiskMeter(count) {
+            const low = document.getElementById('risk-low');
+            const med = document.getElementById('risk-med');
+            const high = document.getElementById('risk-high');
+            const label = document.getElementById('risk-label');
+
+            // Reset all bars to inactive
+            const inactiveClass = 'h-2 w-8 rounded-sm bg-gray-800 transition-all duration-300';
+            low.className = inactiveClass;
+            med.className = inactiveClass;
+            high.className = inactiveClass;
+
+            if (count === 0) {
+                low.className = 'h-2 w-8 rounded-sm bg-emerald-500 shadow-[0_0_8px_#10b981] transition-all duration-300';
+                label.innerText = 'LOW';
+                label.className = 'text-xs font-mono text-emerald-500 ml-2 font-bold w-10 text-center';
+            } else if (count <= 2) {
+                low.className = 'h-2 w-8 rounded-sm bg-yellow-500 shadow-[0_0_8px_#eab308] transition-all duration-300';
+                med.className = 'h-2 w-8 rounded-sm bg-yellow-500 shadow-[0_0_8px_#eab308] transition-all duration-300';
+                label.innerText = 'MED';
+                label.className = 'text-xs font-mono text-yellow-500 ml-2 font-bold w-10 text-center';
+            } else {
+                low.className = 'h-2 w-8 rounded-sm bg-red-500 shadow-[0_0_8px_#ef4444] transition-all duration-300';
+                med.className = 'h-2 w-8 rounded-sm bg-red-500 shadow-[0_0_8px_#ef4444] transition-all duration-300';
+                high.className = 'h-2 w-8 rounded-sm bg-red-500 shadow-[0_0_8px_#ef4444] transition-all duration-300';
+                label.innerText = 'HIGH';
+                label.className = 'text-xs font-mono text-red-500 ml-2 font-bold w-10 text-center animate-pulse';
+            }
+        }
+
+        function appendSystemGreeting() {
+            const div = document.createElement('div');
+            div.className = 'flex flex-col mb-4 w-full';
+            div.innerHTML = `
+                <div class="glass p-5 rounded-2xl border-l-4 border-emerald-500 shadow-xl">
+                    <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs mb-2">
+                        <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        SYSTEM INITIALIZED
+                    </div>
+                    <p class="text-sm text-gray-200 leading-relaxed">
+                        Welcome back, Adarsh. Privacy Firewall is fully operational. PII scrubbers are actively armed for names, passwords, API keys, Aadhaar numbers, and financial data. Drop a test prompt below to observe real-time vault tokenization.
+                    </p>
+                </div>
+            `;
+            chatContainer.appendChild(div);
+        }
+
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            appendMessage('You', text, 'flex-row-reverse', 'bg-gray-800 text-white border border-gray-700/50');
+            userInput.value = '';
+            
+            // Reset Risk Meter to analyzing state (yellow pulse) during inference
+            document.getElementById('risk-low').className = 'h-2 w-8 rounded-sm bg-yellow-500 animate-pulse transition-all duration-300';
+            document.getElementById('risk-med').className = 'h-2 w-8 rounded-sm bg-yellow-500 animate-pulse transition-all duration-300';
+            document.getElementById('risk-label').innerText = 'SCAN';
+            document.getElementById('risk-label').className = 'text-xs font-mono text-yellow-500 ml-2 font-bold w-10 text-center';
+
+            const loadingId = 'loading-' + Date.now();
+            appendLoading(loadingId);
+
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/secure-chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text, fun_mode: funToggle.checked })
+                });
+
+                if (!response.ok) throw new Error('Server error');
+                document.getElementById(loadingId).remove();
+               
+                const firewallId = 'fw-' + Date.now();
+                appendGrokResponse(firewallId);
+               
+                const safePromptEl = document.getElementById(`${firewallId}-safe`);
+                const responseEl = document.getElementById(`${firewallId}-response`);
+                const visualizerEl = document.getElementById(`${firewallId}-visualizer`);
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = "";
+                let scrubbedItems = 0;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                   
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n\n');
+                    buffer = lines.pop();
+                   
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = JSON.parse(line.substring(6));
+                            if (data.type === 'meta') {
+                                safePromptEl.innerText = data.safe_prompt;
+                                // Count how many tokens were created
+                                scrubbedItems = (data.safe_prompt.match(/\[.*?\]/g) || []).length;
+                                
+                                // UPDATE THE HEADER BAR
+                                updateRiskMeter(scrubbedItems);
+
+                                if(scrubbedItems > 0) {
+                                    visualizerEl.innerHTML = `<span class="text-emerald-400 font-bold">🛡️ Firewall Triggered:</span> Intercepted and vaulted <span class="text-white font-mono bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-800">${scrubbedItems}</span> sensitive entity/entities prior to LLM ingress.`;
+                                } else {
+                                    visualizerEl.innerHTML = `<span class="text-gray-400">✨ Clean Transmission: Zero sensitive entities detected. Passed directly.</span>`;
+                                }
+                            } else if (data.type === 'token') {
+                                responseEl.innerText += data.content;
+                                chatContainer.scrollTop = chatContainer.scrollHeight;
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                if(document.getElementById(loadingId)) document.getElementById(loadingId).remove();
+                appendMessage('System', 'Connection failure. Verify Uvicorn backend is running on port 8000.', 'flex-row', 'bg-red-950/60 text-red-300 border border-red-900');
+                updateRiskMeter(0); // Reset to low on error
+            }
+        });
+
+        function appendMessage(sender, text, align, bgClass) {
+            const div = document.createElement('div');
+            div.className = `flex ${align} mb-4 w-full`;
+            div.innerHTML = `<div class="${bgClass} px-5 py-3.5 rounded-2xl max-w-[80%] text-sm leading-relaxed shadow-lg">${escapeHtml(text)}</div>`;
+            chatContainer.appendChild(div);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function appendLoading(id) {
+            const div = document.createElement('div');
+            div.id = id;
+            div.className = `flex flex-row mb-4`;
+            div.innerHTML = `<div class="glass px-5 py-3 text-gray-400 text-xs mono flex items-center gap-3 rounded-xl border border-gray-800">
+                <div class="w-3.5 h-3.5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                Analyzing risk score & sanitizing vectors...
+            </div>`;
+            chatContainer.appendChild(div);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function appendGrokResponse(id) {
+            const div = document.createElement('div');
+            div.className = `flex flex-col mb-6 w-full`;
+            div.innerHTML = `
+                <div class="glass p-4 rounded-2xl w-full space-y-3 shadow-xl border border-gray-800/80">
+                    <div id="${id}-visualizer" class="text-xs font-mono pb-2 border-b border-gray-800/80"></div>
+                    <div>
+                        <span class="text-[10px] uppercase tracking-widest text-emerald-500 font-mono font-bold mb-1 block">Sanitized Prompt Sent to Groq (Tokenized)</span>
+                        <div id="${id}-safe" class="text-xs text-gray-400 mono bg-black/60 p-2.5 rounded-xl border border-gray-900 block overflow-x-auto"></div>
+                    </div>
+                </div>
+                <div class="mt-4 px-2">
+                    <div class="text-[10px] uppercase tracking-widest text-gray-500 font-mono mb-1">Rehydrated AI Response</div>
+                    <div id="${id}-response" class="text-sm leading-relaxed text-gray-100 whitespace-pre-wrap"></div>
+                </div>
+            `;
+            chatContainer.appendChild(div);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function escapeHtml(str) { return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+    </script>
+</body>
+</html>
